@@ -34,7 +34,7 @@ func gopath() []string {
 
 func loadMessage(files []string, messageName string) (proto.Message, error) {
 	parser := protoparse.Parser{
-		ImportPaths: append(gopath(), "."),
+		ImportPaths: append(gopath(), ".", "/"),
 	}
 	descriptors, err := parser.ParseFiles(files...)
 	if err != nil {
