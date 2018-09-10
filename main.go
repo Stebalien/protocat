@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -93,7 +94,30 @@ func main() {
 			default:
 				Error.Fatal(err)
 			}
-			marshaler.Marshal(os.Stdout, message)
+			if err := marshaler.Marshal(os.Stdout, message); err != nil {
+				Error.Fatal(err)
+			}
+			message.Reset()
+		}
+	} else {
+		decoder := json.NewDecoder(os.Stdin)
+		var writer ggio.Writer
+		if *delimited {
+			writer = ggio.NewDelimitedWriter(os.Stdout)
+		} else {
+			writer = ggio.NewFullWriter(os.Stdout)
+		}
+		for {
+			switch err := jsonpb.UnmarshalNext(decoder, message); err {
+			case nil:
+			case io.EOF:
+				return
+			default:
+				Error.Fatal(err)
+			}
+			if err := writer.WriteMsg(message); err != nil {
+				Error.Fatal(err)
+			}
 			message.Reset()
 		}
 	}
