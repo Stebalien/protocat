@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	ggio "github.com/gogo/protobuf/io"
 	jsonpb "github.com/golang/protobuf/jsonpb"
@@ -32,27 +33,36 @@ func gopath() []string {
 	return path
 }
 
-func loadMessage(files []string, messageName string) (proto.Message, error) {
+func loadMessage(path []string, name string) (proto.Message, error) {
+	if len(path) == 0 {
+		path = append(gopath(), ".", "/")
+	}
 	parser := protoparse.Parser{
-		ImportPaths: append(gopath(), ".", "/"),
+		ImportPaths: path,
 	}
-	descriptors, err := parser.ParseFiles(files...)
-	if err != nil {
-		Error.Fatal(err)
+	typeOffset := strings.LastIndexByte(name, '.')
+	if typeOffset < 0 {
+		return nil, fmt.Errorf("no protobuf message name in %s", name)
 	}
+	messageName := name[typeOffset+1:]
+	fileName := name[:typeOffset] + ".proto"
 
-	for _, d := range descriptors {
-		if md := d.FindMessage(messageName); md != nil {
-			return protodynamic.NewMessage(md), nil
-		}
+	descriptors, err := parser.ParseFiles(fileName)
+	if err != nil {
+		return nil, err
 	}
-	return nil, fmt.Errorf("message %s not defined", messageName)
+	d := descriptors[0]
+	md := d.FindMessage(fmt.Sprintf("%s.%s", d.GetPackage(), messageName))
+	if md == nil {
+		return nil, fmt.Errorf("message %s not defined in %s", messageName, fileName)
+	}
+	return protodynamic.NewMessage(md), nil
 }
 
 func main() {
 	var flags flag.FlagSet
 	flags.Usage = func() {
-		fmt.Fprintln(flags.Output(), "Usage: protocat [-d] [-l] [-m MAX_SIZE] TYPE FILES...")
+		fmt.Fprintln(flags.Output(), "Usage: protocat [-d] [-l] [-m MAX_SIZE] TYPE [PATH ...]")
 		flags.PrintDefaults()
 	}
 	decode := flags.Bool("d", false, "decode (default encode)")
@@ -65,8 +75,8 @@ func main() {
 	default:
 		os.Exit(2)
 	}
-	if flags.NArg() < 2 {
-		fmt.Fprintln(flags.Output(), "at least two arguments required")
+	if flags.NArg() < 1 {
+		fmt.Fprintln(flags.Output(), "protobuf message type required")
 		flags.Usage()
 		os.Exit(2)
 	}
