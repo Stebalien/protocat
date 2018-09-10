@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -17,7 +16,6 @@ import (
 	protodynamic "github.com/jhump/protoreflect/dynamic"
 )
 
-var Info = log.New(ioutil.Discard, "I: ", 0)
 var Error = log.New(os.Stderr, "E: ", 0)
 
 func gopath() []string {
@@ -53,9 +51,12 @@ func loadMessage(files []string, messageName string) (proto.Message, error) {
 
 func main() {
 	var flags flag.FlagSet
-	decode := flags.Bool("d", false, "decode instead of encoding")
+	flags.Usage = func() {
+		fmt.Fprintln(flags.Output(), "Usage: protocat [-d] [-l] [-m MAX_SIZE] TYPE FILES...")
+		flags.PrintDefaults()
+	}
+	decode := flags.Bool("d", false, "decode (default encode)")
 	delimited := flags.Bool("l", false, "length delimited (varint)")
-	verbose := flags.Bool("v", false, "print status messages")
 	maxSize := flags.Int("m", 8*1024, "max message size (in KiB)")
 	switch err := flags.Parse(os.Args[1:]); err {
 	case nil:
@@ -64,11 +65,10 @@ func main() {
 	default:
 		os.Exit(2)
 	}
-	if *verbose {
-		Info.SetOutput(os.Stderr)
-	}
 	if flags.NArg() < 2 {
-		Error.Fatal("invalid arguments")
+		fmt.Fprintln(flags.Output(), "at least two arguments required")
+		flags.Usage()
+		os.Exit(2)
 	}
 	message, err := loadMessage(flags.Args()[1:], flags.Arg(0))
 	if err != nil {
