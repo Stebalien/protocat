@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"go/build"
 	"io"
 	"log"
 	"os"
-	"path/filepath"
 	"strings"
 
 	ggio "github.com/gogo/protobuf/io"
@@ -19,23 +19,9 @@ import (
 
 var Error = log.New(os.Stderr, "E: ", 0)
 
-func gopath() []string {
-	path := filepath.SplitList(os.Getenv("GOPATH"))
-	if len(path) == 0 {
-		home := os.Getenv("HOME")
-		if home != "" {
-			path = []string{home + "/go"}
-		}
-	}
-	for i := range path {
-		path[i] += "/src"
-	}
-	return path
-}
-
 func loadMessage(path []string, name string) (proto.Message, error) {
 	if len(path) == 0 {
-		path = append(gopath(), ".", "/")
+		path = build.Default.SrcDirs()
 	}
 	parser := protoparse.Parser{
 		ImportPaths: path,
